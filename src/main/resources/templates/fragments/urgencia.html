@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--
+  Selo de urgência para listas (home e status). O nível sempre aparece em texto, não só por cor (RQ-007).
+  Uso: <th:block th:replace="~{fragments/urgencia :: selo(${denuncia})}"></th:block>
+-->
+<th:block th:fragment="selo(denuncia)">
+    <span th:if="${denuncia.classificacaoPendente}" class="pill pill-neutro">Em classificação</span>
+    <th:block th:unless="${denuncia.classificacaoPendente}"
+              th:switch="${denuncia.urgencia != null ? denuncia.urgencia.name() : 'NENHUM'}">
+        <span th:case="'EMERGENCIA'" class="pill pill-emergencia" th:text="${denuncia.urgencia.descricao}"></span>
+        <span th:case="'MUITO_URGENTE'" class="pill pill-muito" th:text="${denuncia.urgencia.descricao}"></span>
+        <span th:case="'URGENTE'" class="pill pill-urgente" th:text="${denuncia.urgencia.descricao}"></span>
+        <span th:case="'POUCO_URGENTE'" class="pill pill-pouco" th:text="${denuncia.urgencia.descricao}"></span>
+        <span th:case="'NAO_URGENTE'" class="pill pill-nao" th:text="${denuncia.urgencia.descricao}"></span>
+        <span th:case="'INSUFICIENTE'" class="pill pill-neutro" th:text="${denuncia.urgencia.descricao}"></span>
+        <span th:case="*" class="pill pill-neutro">Sem classificação</span>
+    </th:block>
+    <small th:if="${denuncia.revisaoManual}" class="pill-note"><i class="bi bi-eye"></i>Revisão manual necessária</small>
+</th:block>
+
+<!-- Selo em formato de badge para a tela de detalhe. -->
+<th:block th:fragment="badge(denuncia)">
+    <span th:if="${denuncia.classificacaoPendente}" class="pill pill-lg pill-neutro">Em classificação</span>
+    <th:block th:unless="${denuncia.classificacaoPendente}"
+              th:switch="${denuncia.urgencia != null ? denuncia.urgencia.name() : 'NENHUM'}">
+        <span th:case="'EMERGENCIA'" class="pill pill-lg pill-emergencia" th:text="${denuncia.urgencia.descricao}"></span>
+        <span th:case="'MUITO_URGENTE'" class="pill pill-lg pill-muito" th:text="${denuncia.urgencia.descricao}"></span>
+        <span th:case="'URGENTE'" class="pill pill-lg pill-urgente" th:text="${denuncia.urgencia.descricao}"></span>
+        <span th:case="'POUCO_URGENTE'" class="pill pill-lg pill-pouco" th:text="${denuncia.urgencia.descricao}"></span>
+        <span th:case="'NAO_URGENTE'" class="pill pill-lg pill-nao" th:text="${denuncia.urgencia.descricao}"></span>
+        <span th:case="'INSUFICIENTE'" class="pill pill-lg pill-neutro" th:text="${denuncia.urgencia.descricao}"></span>
+        <span th:case="*" class="pill pill-lg pill-neutro">Sem classificação</span>
+    </th:block>
+</th:block>
+
+<!-- Justificativa e origem da classificação (detalhe). -->
+<th:block th:fragment="justificativa(denuncia)">
+    <div th:if="${denuncia.justificativaUrgencia != null or denuncia.revisaoManual}"
+         class="urgencia-nota mb-4" role="note" aria-label="Justificativa da classificação de urgência">
+        <p class="mb-1" th:if="${denuncia.justificativaUrgencia != null}">
+            <strong>Justificativa:</strong>
+            <span th:text="${denuncia.justificativaUrgencia}"></span>
+        </p>
+        <p class="mb-1" th:if="${denuncia.origemClassificacao != null and denuncia.justificativaUrgencia != null}">
+            <small th:text="${denuncia.origemClassificacao.descricao}"></small>
+        </p>
+        <p class="mb-0" th:if="${denuncia.revisaoManual}">
+            <small><i class="bi bi-eye me-1"></i>Revisão manual necessária.</small>
+        </p>
+    </div>
+</th:block>
+</body>
+</html>

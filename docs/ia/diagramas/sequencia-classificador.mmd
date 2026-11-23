@@ -1,0 +1,74 @@
+sequenceDiagram
+    autonumber
+    actor C as Cidadão
+    participant W as Spring Boot<br/>(DenunciaService)
+    participant DB as PostgreSQL
+    participant H as HttpClassificador<br/>(após o commit)
+    participant A as Agente Python<br/>(Classificador)
+    participant L as Limitador<br/>(30/min · 1 por vez)
+    participant M as Modelo LLM<br/>(API compatível OpenAI)
+    participant R as Regras +<br/>Árbitro (determinísticos)
+    actor O as Organização
+
+    C->>W: registra denúncia (sem campo de urgência)
+    W->>DB: salva (status PENDENTE, solicitacaoId novo)
+    W-->>C: "em classificação"
+    W-)H: ClassificacaoSolicitadaEvent (AFTER_COMMIT)
+    H->>A: POST /classificar {tipoAnimal, descrição, pontoRef}<br/>(sem contato, usuário, foto ou endereço)
+
+    rect rgb(238,244,255)
+    Note over A,R: Cadeia de decisão do agente (modo híbrido)
+    A->>A: sanitiza e trunca (início+fim) · detecta injeção (heurística)
+    A->>A: monta prompt-v2: rubrica + exemplos + roteiro de raciocínio<br/>relato entre delimitadores com nonce aleatório
+    loop até 2 tentativas (só se o erro for repetível)
+        A->>L: pedir vaga
+        alt limite estourado
+            L-->>A: negado (modelo nem é chamado)
+        else vaga concedida
+            A->>M: chat/completions · temperature 0 · JSON · max_tokens
+            M-->>A: {analise (descartada), nivel, justificativa, confianca}
+            A->>A: valida esquema rígido<br/>(nível em lista fechada, campos extras ignorados)
+        end
+    end
+    alt modelo respondeu com saída válida
+        A->>R: classificar por regras (mesmo relato)
+        R-->>A: nível das regras
+        alt regras graves e modelo ≥ 2 níveis abaixo (ou abstém)
+            Note over A: PISO DE SEGURANÇA: sobe para o nível das regras<br/>revisão manual = sim
+        else injeção suspeita e regras conclusivas discordam
+            Note over A: ÁRBITRO: prevalece a leitura das regras<br/>revisão manual = sim
+        else modelo inconclusivo (INSUFICIENTE ou confiança < 0,6) e regras com sinal
+            Note over A: PLANO B: vale o nível mais grave entre modelo e regras<br/>(origem REGRAS ou IA) · revisão manual = sim
+        else
+            Note over A: mantém o modelo (origem IA)<br/>revisão manual se confiança < 0,6 ou INSUFICIENTE
+        end
+    else sem internet / timeout / vazão / saída inválida
+        A->>R: classificar por regras
+        alt regras reconhecem sinais
+            R-->>A: nível (origem REGRAS, revisão manual = sim)
+        else nada reconhecido
+            R-->>A: INSUFICIENTE (abstenção, revisão manual = sim)
+        end
+    end
+    end
+
+    A-->>H: ResultadoClassificacao {nivel, justificativa, confianca,<br/>origem, versaoClassificador, revisaoManual, solicitacaoId}
+    H->>W: aplicarClassificacao(resultado)
+    alt solicitacaoId desatualizado ou status ≠ PENDENTE
+        W->>W: descarta (corrida com edição, correção ou prazo)
+    else resultado atual
+        W->>DB: grava nível, justificativa, confiança, origem, versão, status CONCLUIDA
+    end
+
+    opt agente fora do ar / erro HTTP
+        H->>W: registrarFalhaClassificacao
+        W->>DB: INSUFICIENTE + revisão manual (ou mantém nível anterior)
+    end
+    opt Scheduler a cada 30 s
+        W->>DB: pendentes há mais de 180 s → INSUFICIENTE + revisão manual
+    end
+
+    O->>W: corrige urgência (nível + motivo opcional)
+    W->>DB: grava origem ORGANIZACAO + log de auditoria (antes/depois)<br/>a correção humana sempre prevalece (RF-017)
+    C->>W: edita descrição ou ponto de referência
+    W->>DB: nova solicitacaoId · status PENDENTE · reenvia ao agente

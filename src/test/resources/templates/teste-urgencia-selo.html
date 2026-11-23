@@ -1,0 +1,8 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div id="selo"><th:block th:replace="~{fragments/urgencia :: selo(${denuncia})}"></th:block></div>
+<div id="badge"><th:block th:replace="~{fragments/urgencia :: badge(${denuncia})}"></th:block></div>
+<div id="justificativa"><th:block th:replace="~{fragments/urgencia :: justificativa(${denuncia})}"></th:block></div>
+</body>
+</html>
